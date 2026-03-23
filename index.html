@@ -170,7 +170,7 @@
   .add-ex-btn:active { transform: scale(0.98); }
 
   /* ── Exercise Chip row ── */
-  .ex-chip { display: flex; align-items: center; padding: 11px 14px; border-bottom: 1px solid rgba(39,32,16,0.8); cursor: pointer; transition: background 0.15s; gap: 10px; }
+  .ex-chip { display: flex; align-items: center; padding: 11px 14px; border-bottom: 1px solid rgba(255,255,255,0.05); cursor: pointer; transition: background 0.15s; gap: 10px; }
   .ex-chip:hover { background: var(--accent-dim); }
   .ex-chip-info { flex: 1; min-width: 0; }
   .ex-chip-name { font-size: 13px; font-weight: 700; color: var(--warm-white); display: flex; align-items: center; gap: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -270,7 +270,7 @@
   select, textarea { background: var(--bg4); border: 1px solid var(--border2); color: var(--text); border-radius: 8px; padding: 9px 12px; font-family: 'DM Sans', sans-serif; font-size: 14px; outline: none; width: 100%; transition: border-color 0.15s; }
   select:focus, textarea:focus { border-color: var(--accent-glow); }
   textarea { resize: none; }
-  select option { background: #1c1810; }
+  select option { background: #0a0814; }
 
   /* Fade animation */
   @keyframes fadeIn { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:translateY(0); } }
@@ -308,7 +308,7 @@
   .del-btn:hover { color: var(--text2); border-color: var(--border2); }
 
   /* Toast */
-  .toast { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); background: var(--accent); color: #000; border-radius: 10px; padding: 10px 20px; font-size: 13px; font-weight: 700; box-shadow: 0 4px 24px rgba(245,158,11,0.35); z-index: 999; opacity: 0; transition: opacity 0.3s; pointer-events: none; font-family: 'DM Sans', sans-serif; white-space: nowrap; }
+  .toast { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); background: var(--accent); color: #000; border-radius: 10px; padding: 10px 20px; font-size: 13px; font-weight: 700; box-shadow: 0 2px 16px rgba(0,0,0,0.4); z-index: 999; opacity: 0; transition: opacity 0.3s; pointer-events: none; font-family: 'DM Sans', sans-serif; white-space: nowrap; }
   .toast.show { opacity: 1; }
 
   /* Muscle group color accents */
@@ -1324,7 +1324,7 @@ const RECS = {
   ],
 };
 
-const TAG_COLORS = { compound:"#f59e0b", isolation:"#60a5fa", health:"#4ade80", core:"#c084fc" };
+const TAG_COLORS = { compound:"var(--accent)", isolation:"#60a5fa", health:"#4ade80", core:"#a78bfa" };
 
 // ─── STONE PATH — 20 unique stones, each with its own color ─────────────────
 
@@ -1840,10 +1840,7 @@ function today() {
 
 function pct(c,s,g) { return Math.min(100,Math.max(0,Math.round(((c-s)/(g-s))*100))); }
 
-function getLatest(sessions, field) {
-  const relevant = sessions.filter(s=>s[field]!=null);
-  return relevant.length ? relevant[relevant.length-1][field] : null;
-}
+
 
 function bestPR(lift) {
   const arr = state.prs[lift]||[];
@@ -2340,31 +2337,46 @@ function removeExercise(bi, ex) {
 // ─── DRUM-ROLL WHEEL PICKER ──────────────────────────────────────────────────
 
 function openWheelPicker(ex, bi, setIdx) {
-  // setIdx = which set to edit (undefined = add new set)
   closeAllSheets();
-  if(!ui.formData[ex]) ui.formData[ex] = {sets:[{weight:135,reps:8}]};
+  if (!ui.formData[ex]) ui.formData[ex] = {sets:[{weight:135,reps:8}]};
   const exSets = ui.formData[ex].sets || [{weight:135,reps:8}];
-  const isGoal = ex==="Squat"||ex==="Bench Press";
   const isNew  = setIdx === undefined;
-  // For new set, default to last set's values
   const lastSet = exSets[exSets.length-1] || {weight:135,reps:8};
   const editSet = isNew ? {...lastSet} : (exSets[setIdx] || lastSet);
 
+  // Weight array: 5 lb steps from 10 to 700
   const weights = [];
-  for(let w=10; w<=(isGoal?500:400); w+=5) weights.push(w);
-  const reps = [];
-  for(let r=1; r<=30; r++) reps.push(r);
+  for (let w = 10; w <= 700; w += 5) weights.push(w);
 
-  const wIdx = Math.max(0, weights.findIndex(w=>w>=editSet.weight));
-  const rIdx = Math.max(0, reps.indexOf(editSet.reps));
+  // Reps array: 1–50
+  const reps = [];
+  for (let r = 1; r <= 50; r++) reps.push(r);
+
+  // Find exact index, snap to nearest 5 for weight
+  const targetWeight = Math.round(editSet.weight / 5) * 5;
+  const wIdx = Math.max(0, weights.indexOf(targetWeight) !== -1
+    ? weights.indexOf(targetWeight)
+    : weights.findIndex(w => w >= editSet.weight));
+  const rIdx = Math.max(0, Math.min(reps.length - 1, (editSet.reps || 8) - 1));
 
   const overlay = document.createElement("div");
   overlay.className = "sheet-overlay";
   overlay.id = "wheel-overlay";
-  overlay.onclick = e=>{ if(e.target===overlay) closeAllSheets(); };
-  overlay._ex = ex; overlay._bi = bi; overlay._setIdx = setIdx; overlay._isNew = isNew;
+  overlay.onclick = e => { if (e.target === overlay) closeAllSheets(); };
 
-  const setLabel = isNew ? `Set ${exSets.length+1}` : `Set ${setIdx+1} of ${exSets.length}`;
+  // Store resolved indices on overlay for commitWheelSet to read
+  overlay._ex     = ex;
+  overlay._bi     = bi;
+  overlay._setIdx = setIdx;
+  overlay._isNew  = isNew;
+  overlay._wIdx   = wIdx;
+  overlay._rIdx   = rIdx;
+  overlay._weights = weights;
+  overlay._reps    = reps;
+
+  const setLabel = isNew
+    ? `Adding Set ${exSets.length + 1}`
+    : `Edit Set ${setIdx + 1}`;
 
   overlay.innerHTML = `
     <div class="wheel-sheet" id="wheel-sheet">
@@ -2373,7 +2385,9 @@ function openWheelPicker(ex, bi, setIdx) {
         <span class="wheel-cancel-label" onclick="closeAllSheets()">Cancel</span>
         <button class="wheel-done-btn" onclick="commitWheelSet()">DONE</button>
       </div>
-      <div class="wheel-ex-label">${ex} <span style="font-size:12px;opacity:0.5;font-family:'DM Sans',sans-serif;font-weight:600">${setLabel}</span></div>
+      <div class="wheel-ex-label">${ex}
+        <span style="font-size:11px;opacity:0.4;font-family:'DM Sans',sans-serif;font-weight:500;margin-left:6px">${setLabel}</span>
+      </div>
       <div class="wheels-row">
         ${buildWheelCol("whl-weight", "Weight", weights, wIdx, "lbs")}
         ${buildWheelCol("whl-reps",   "Reps",   reps,    rIdx, "")}
@@ -2381,146 +2395,187 @@ function openWheelPicker(ex, bi, setIdx) {
     </div>`;
 
   document.body.appendChild(overlay);
-  requestAnimationFrame(()=>{
-    ["whl-weight","whl-reps"].forEach(id=>initWheelDrum(id));
+  requestAnimationFrame(() => {
+    initWheelDrum("whl-weight", overlay, "_wIdx");
+    initWheelDrum("whl-reps",   overlay, "_rIdx");
   });
 }
+
 function buildWheelCol(id, label, items, selIdx, unit) {
-  const VISIBLE = 5;
-  const PAD = Math.floor(VISIBLE/2);
-  const all = [...Array(PAD).fill(""), ...items, ...Array(PAD).fill("")];
-  const offsetIdx = selIdx + PAD;
+  const PAD = 2; // items visible above/below center
+  const all = [...Array(PAD).fill(null), ...items, ...Array(PAD).fill(null)];
+  const initialOffset = (PAD - selIdx) * 40;
   return `
     <div class="wheel-col">
-      <div class="wheel-col-label">${label}</div>
-      <div class="wheel-drum" id="${id}" data-items='${JSON.stringify(items)}' data-idx="${selIdx}">
-        <div class="wheel-drum-inner" id="${id}-inner" style="transform:translateY(${(PAD-selIdx)*40}px)">
-          ${all.map((v,i)=>{
-            const dist = Math.abs(i - offsetIdx);
-            const cls  = dist===0?"sel":dist===1?"near1":dist===2?"near2":"";
-            return `<div class="wheel-item${cls?" "+cls:""}">${v===""?"":v}</div>`;
-          }).join("")}
+      <div class="wheel-col-label">${label}${unit ? ` (${unit})` : ''}</div>
+      <div class="wheel-drum" id="${id}">
+        <div class="wheel-drum-inner" id="${id}-inner"
+             style="transform:translateY(${initialOffset}px)">
+          ${all.map((v, i) => {
+            const dist = Math.abs(i - (selIdx + PAD));
+            const cls  = dist === 0 ? 'sel' : dist === 1 ? 'near1' : dist === 2 ? 'near2' : '';
+            return `<div class="wheel-item${cls ? ' ' + cls : ''}">${v === null ? '' : v}</div>`;
+          }).join('')}
         </div>
         <div class="wheel-selector-bar"></div>
         <div class="wheel-fade-t"></div>
         <div class="wheel-fade-b"></div>
       </div>
-      ${unit?`<div class="wheel-unit-label">${unit}</div>`:""}
     </div>`;
 }
 
-function initWheelDrum(id) {
+function initWheelDrum(id, overlay, overlayKey) {
   const drum  = document.getElementById(id);
-  if (!drum) return;
-  const inner = document.getElementById(id+"-inner");
-  const items = JSON.parse(drum.dataset.items);
-  const PAD   = 2;
-  let curIdx  = parseInt(drum.dataset.idx)||0;
-  let startY  = 0;
-  let startOff= 0;
-  let curOff  = (PAD - curIdx) * 40;
+  const inner = document.getElementById(id + '-inner');
+  if (!drum || !inner) return;
 
-  function getOffset(idx) { return (PAD - idx) * 40; }
+  const PAD     = 2;
+  const ITEM_H  = 40;
+  let curIdx    = overlay[overlayKey] || 0;
+  let curOff    = (PAD - curIdx) * ITEM_H;
+  let startY    = 0;
+  let startOff  = 0;
+  let isDragging= false;
+  let velocity  = 0;
+  let lastY     = 0;
+  let lastTime  = 0;
 
-  function applyTransform(off, animate) {
-    inner.style.transition = animate ? "transform 0.22s cubic-bezier(0.25,0.46,0.45,0.94)" : "none";
-    inner.style.transform  = `translateY(${off}px)`;
+  // Total items (excluding padding)
+  const totalItems = inner.querySelectorAll('.wheel-item').length - PAD * 2;
+
+  function clampIdx(idx) {
+    return Math.max(0, Math.min(totalItems - 1, idx));
   }
 
-  function updateClasses(idx) {
-    const all = inner.querySelectorAll(".wheel-item");
-    all.forEach((el, i) => {
+  function setTransform(off, animated) {
+    inner.style.transition = animated
+      ? 'transform 0.18s cubic-bezier(0.25,0.46,0.45,0.94)'
+      : 'none';
+    inner.style.transform = `translateY(${off}px)`;
+  }
+
+  function updateHighlight(idx) {
+    idx = clampIdx(idx);
+    inner.querySelectorAll('.wheel-item').forEach((el, i) => {
       const dist = Math.abs(i - (idx + PAD));
-      el.className = "wheel-item" + (dist===0?" sel":dist===1?" near1":dist===2?" near2":"");
+      el.className = 'wheel-item' + (
+        dist === 0 ? ' sel' :
+        dist === 1 ? ' near1' :
+        dist === 2 ? ' near2' : ''
+      );
     });
-    drum.dataset.idx = idx;
-  }
-
-  function snapTo(idx) {
-    idx = Math.max(0, Math.min(items.length-1, idx));
+    // Write current index back to overlay so commitWheelSet can read it
+    overlay[overlayKey] = idx;
     curIdx = idx;
-    curOff = getOffset(idx);
-    applyTransform(curOff, true);
-    updateClasses(idx);
-    if (navigator.vibrate) navigator.vibrate(8);
+    if (navigator.vibrate && isDragging) navigator.vibrate(6);
   }
 
-  // Touch
-  drum.addEventListener("touchstart", e=>{
+  function snapToIdx(idx) {
+    idx = clampIdx(idx);
+    curOff = (PAD - idx) * ITEM_H;
+    setTransform(curOff, true);
+    updateHighlight(idx);
+  }
+
+  // ── Touch events ──────────────────────────────────────────────────────────
+  drum.addEventListener('touchstart', e => {
     startY   = e.touches[0].clientY;
     startOff = curOff;
-    inner.style.transition = "none";
-  }, {passive:true});
+    lastY    = startY;
+    lastTime = Date.now();
+    velocity = 0;
+    isDragging = true;
+    inner.style.transition = 'none';
+  }, { passive: true });
 
-  drum.addEventListener("touchmove", e=>{
-    const dy = e.touches[0].clientY - startY;
-    curOff   = startOff + dy;
-    applyTransform(curOff, false);
-    // live class update
-    const rawIdx = PAD - curOff/40;
-    updateClasses(Math.round(Math.max(0,Math.min(items.length-1,rawIdx))));
-  }, {passive:true});
+  drum.addEventListener('touchmove', e => {
+    const now = Date.now();
+    const dy  = e.touches[0].clientY - startY;
+    // velocity for momentum flick
+    velocity  = (e.touches[0].clientY - lastY) / (now - lastTime || 1) * 16;
+    lastY     = e.touches[0].clientY;
+    lastTime  = now;
+    curOff    = startOff + dy;
+    inner.style.transform = `translateY(${curOff}px)`;
+    // Live highlight while dragging
+    const liveIdx = clampIdx(Math.round(PAD - curOff / ITEM_H));
+    updateHighlight(liveIdx);
+  }, { passive: true });
 
-  drum.addEventListener("touchend", e=>{
+  drum.addEventListener('touchend', e => {
+    isDragging = false;
     const dy  = e.changedTouches[0].clientY - startY;
-    const raw = PAD - (startOff+dy)/40;
-    snapTo(Math.round(raw));
-  }, {passive:true});
+    // Apply momentum
+    const momentumDelta = velocity * 4;
+    const rawIdx = PAD - (curOff + momentumDelta) / ITEM_H;
+    snapToIdx(Math.round(rawIdx));
+  }, { passive: true });
 
-  // Mouse (desktop)
-  drum.addEventListener("mousedown", e=>{
+  // ── Mouse events (desktop) ────────────────────────────────────────────────
+  drum.addEventListener('mousedown', e => {
     startY   = e.clientY;
     startOff = curOff;
-    inner.style.transition = "none";
-    const onMove = ev=>{
-      const dy = ev.clientY - startY;
-      curOff   = startOff + dy;
-      applyTransform(curOff, false);
-      const rawIdx = PAD - curOff/40;
-      updateClasses(Math.round(Math.max(0,Math.min(items.length-1,rawIdx))));
+    lastY    = startY;
+    lastTime = Date.now();
+    velocity = 0;
+    isDragging = true;
+    inner.style.transition = 'none';
+
+    const onMove = ev => {
+      const now = Date.now();
+      velocity  = (ev.clientY - lastY) / (now - lastTime || 1) * 16;
+      lastY     = ev.clientY;
+      lastTime  = now;
+      curOff    = startOff + (ev.clientY - startY);
+      inner.style.transform = `translateY(${curOff}px)`;
+      updateHighlight(clampIdx(Math.round(PAD - curOff / ITEM_H)));
     };
-    const onUp = ev=>{
-      document.removeEventListener("mousemove", onMove);
-      document.removeEventListener("mouseup", onUp);
-      const dy  = ev.clientY - startY;
-      const raw = PAD - (startOff+dy)/40;
-      snapTo(Math.round(raw));
+
+    const onUp = ev => {
+      isDragging = false;
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+      const momentumDelta = velocity * 4;
+      const rawIdx = PAD - (curOff + momentumDelta) / ITEM_H;
+      snapToIdx(Math.round(rawIdx));
     };
-    document.addEventListener("mousemove", onMove);
-    document.addEventListener("mouseup", onUp);
+
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
   });
 
-  // Scroll wheel
-  drum.addEventListener("wheel", e=>{
+  // ── Scroll wheel ──────────────────────────────────────────────────────────
+  drum.addEventListener('wheel', e => {
     e.preventDefault();
-    snapTo(curIdx + (e.deltaY > 0 ? 1 : -1));
-  }, {passive:false});
+    snapToIdx(curIdx + (e.deltaY > 0 ? 1 : -1));
+  }, { passive: false });
 }
 
 function commitWheelSet() {
-  const overlay = document.getElementById("wheel-overlay");
+  const overlay = document.getElementById('wheel-overlay');
   if (!overlay) return;
-  const ex     = overlay._ex;
-  const bi     = overlay._bi;
-  const setIdx = overlay._setIdx;
-  const isNew  = overlay._isNew;
 
-  const wDrum = document.getElementById("whl-weight");
-  const rDrum = document.getElementById("whl-reps");
-  if (!wDrum||!rDrum) { closeAllSheets(); return; }
+  const ex      = overlay._ex;
+  const bi      = overlay._bi;
+  const setIdx  = overlay._setIdx;
+  const isNew   = overlay._isNew;
 
-  const weights = JSON.parse(wDrum.dataset.items);
-  const reps    = JSON.parse(rDrum.dataset.items);
-  const w = weights[parseInt(wDrum.dataset.idx)||0];
-  const r = reps[parseInt(rDrum.dataset.idx)||0];
+  // Read the final selected indices directly from overlay (updated by updateHighlight)
+  const wIdx = overlay._wIdx;
+  const rIdx = overlay._rIdx;
+  const weights = overlay._weights;
+  const reps    = overlay._reps;
 
-  if (!ui.formData[ex]) ui.formData[ex] = {sets:[]};
+  const w = weights[wIdx] ?? 135;
+  const r = reps[rIdx]    ?? 8;
+
+  if (!ui.formData[ex]) ui.formData[ex] = { sets: [] };
   if (!ui.formData[ex].sets) ui.formData[ex].sets = [];
 
   if (isNew) {
-    ui.formData[ex].sets.push({weight:w, reps:r});
+    ui.formData[ex].sets.push({ weight: w, reps: r });
   } else {
-    ui.formData[ex].sets[setIdx] = {weight:w, reps:r};
+    ui.formData[ex].sets[setIdx] = { weight: w, reps: r };
   }
 
   closeAllSheets();
@@ -2712,42 +2767,6 @@ function removeStretch(bi, name) {
 }
 
 // ── 3-rec cycling system for stretches ──────────────────────────────────────
-function buildStretchRecSection(bi, blockName) {
-  const recCats   = STRETCH_RECS[blockName] || [Object.keys(ALL_STRETCH_CATEGORIES)[0]];
-  const added     = ui.stretchBlocks[bi] || [];
-
-  // Pool: take up to 3 recs, cycling in new ones as the user adds them
-  let pool = [];
-  recCats.forEach(catName => {
-    const cat = ALL_STRETCH_CATEGORIES[catName];
-    if (cat) pool.push(...cat.stretches);
-  });
-
-  // Remove already-added, then show 3 at a time
-  const available = pool.filter(s => !added.includes(s.name));
-  const recs      = available.slice(0, 3);
-  if (!recs.length) return "";
-
-  const cards = recs.map((s, i) => {
-    return `<div class="rec-card" onclick="addStretchFromRec(${bi},'${s.name.replace(/'/g,"\'")}')">
-      <div class="rec-num">${i+1}</div>
-      <div class="rec-body">
-        <div class="rec-name">${s.name}</div>
-        <div class="rec-why">${s.note}</div>
-        <div class="rec-meta">
-          <span class="rec-scheme">${fmtSec(s.dur)} hold</span>
-        </div>
-      </div>
-      <div class="rec-add" onclick="event.stopPropagation();addStretchFromRec(${bi},'${s.name.replace(/'/g,"\'")}')">+</div>
-    </div>`;
-  }).join("");
-
-  return `<div class="rec-section">
-    <div class="rec-header">Recommended</div>
-    ${cards}
-  </div>`;
-}
-
 function addStretchFromRec(bi, name) {
   if (!ui.stretchBlocks[bi]) ui.stretchBlocks[bi] = [];
   if (!ui.stretchBlocks[bi].includes(name)) {
@@ -2851,10 +2870,7 @@ function addStretchItem(bi, name) {
   renderContent();
 }
 
-function setRoutine(r) { ui.activeRoutine=r; ui.completedStr={}; renderContent(); }
 
-
-// ─── RENDER PRs ──────────────────────────────────────────────────────────────
 
 function renderPRs() {
   let html=`
@@ -3129,7 +3145,8 @@ function renderBW() {
   if(bw.length>1) setTimeout(()=>{
     const ctx=document.getElementById("bw-chart");
     if(!ctx) return;
-    new Chart(ctx,{type:"line",data:{labels:bw.map((_,i)=>`#${i+1}`),datasets:[{data:bw.map(e=>e.weight),borderColor:getComputedStyle(document.documentElement).getPropertyValue('--accent').trim(),backgroundColor:"rgba(255,255,255,0.03)",borderWidth:2,pointBackgroundColor:getComputedStyle(document.documentElement).getPropertyValue('--accent').trim(),pointRadius:4,tension:0.3}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>`${ctx.raw} lbs`},backgroundColor:"#1c1810",bodyColor:"#f5ead8",borderColor:"rgba(245,158,11,0.2)",borderWidth:1}},scales:{x:{ticks:{color:"#4a3c25",font:{size:10}},grid:{color:"rgba(39,32,16,0.6)"}},y:{ticks:{color:"#4a3c25",font:{size:10}},grid:{color:"rgba(39,32,16,0.6)"},min:Math.min(...bw.map(e=>e.weight))-5,max:Math.max(...bw.map(e=>e.weight))+5}}}});
+    const acRaw=getComputedStyle(document.documentElement).getPropertyValue('--accent').trim()||'#c084fc';
+    new Chart(ctx,{type:"line",data:{labels:bw.map((_,i)=>`#${i+1}`),datasets:[{data:bw.map(e=>e.weight),borderColor:acRaw,backgroundColor:acRaw+'18',borderWidth:2,pointBackgroundColor:acRaw,pointRadius:4,fill:true,tension:0.4}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>`${ctx.raw} lbs`},backgroundColor:'rgba(10,8,18,0.95)',bodyColor:'#fff',titleColor:'rgba(255,255,255,0.5)',borderColor:acRaw,borderWidth:1}},scales:{x:{ticks:{color:'rgba(255,255,255,0.3)',font:{size:10}},grid:{color:'rgba(255,255,255,0.06)'}},y:{ticks:{color:'rgba(255,255,255,0.3)',font:{size:10}},grid:{color:'rgba(255,255,255,0.06)'},min:Math.min(...bw.map(e=>e.weight))-5,max:Math.max(...bw.map(e=>e.weight))+5}}}});
   },50);
 }
 
